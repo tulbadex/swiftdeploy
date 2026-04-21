@@ -1,0 +1,10 @@
+.git
+.gitignore
+README.md
+question.txt
+templates/
+swiftdeploy
+manifest.yaml
+docker-compose.yml
+nginx.conf
+*.md
