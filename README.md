@@ -228,13 +228,12 @@ curl -X POST http://localhost:8080/chaos \
 
 ```yaml
 services:
-  app:
-    image: swiftdeploy:latest
-    port: 3000
-    mode: stable
-    version: "1.0.0"
-    replicas: 1
-    restart_policy: unless-stopped
+  image: swiftdeploy:latest
+  port: 3000
+  mode: stable
+  version: "1.0.0"
+  replicas: 1
+  restart: unless-stopped
 
 nginx:
   image: nginx:latest

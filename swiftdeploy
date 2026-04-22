@@ -81,11 +81,11 @@ yaml_get() {
 
 # ─── Read manifest values ───
 read_manifest() {
-    APP_IMAGE=$(yaml_get "$MANIFEST" "services.app.image") || APP_IMAGE=""
-    APP_PORT=$(yaml_get "$MANIFEST" "services.app.port") || APP_PORT=""
-    APP_MODE=$(yaml_get "$MANIFEST" "services.app.mode") || APP_MODE="stable"
-    APP_VERSION=$(yaml_get "$MANIFEST" "services.app.version") || APP_VERSION="1.0.0"
-    RESTART_POLICY=$(yaml_get "$MANIFEST" "services.app.restart_policy") || RESTART_POLICY="unless-stopped"
+    APP_IMAGE=$(yaml_get "$MANIFEST" "services.image") || APP_IMAGE=""
+    APP_PORT=$(yaml_get "$MANIFEST" "services.port") || APP_PORT=""
+    APP_MODE=$(yaml_get "$MANIFEST" "services.mode") || APP_MODE="stable"
+    APP_VERSION=$(yaml_get "$MANIFEST" "services.version") || APP_VERSION="1.0.0"
+    RESTART_POLICY=$(yaml_get "$MANIFEST" "services.restart") || RESTART_POLICY="unless-stopped"
     NGINX_IMAGE=$(yaml_get "$MANIFEST" "nginx.image") || NGINX_IMAGE=""
     NGINX_PORT=$(yaml_get "$MANIFEST" "nginx.port") || NGINX_PORT=""
     PROXY_TIMEOUT=$(yaml_get "$MANIFEST" "nginx.proxy_timeout") || PROXY_TIMEOUT="30"
@@ -237,7 +237,7 @@ cmd_deploy() {
     cmd_init
 
     info "Building Docker image..."
-    docker build -t "$(yaml_get "$MANIFEST" "services.app.image")" "$SCRIPT_DIR"
+    docker build -t "$(yaml_get "$MANIFEST" "services.image")" "$SCRIPT_DIR"
 
     info "Bringing up the stack..."
     docker compose -f "$GENERATED_COMPOSE" up -d
@@ -287,8 +287,8 @@ cmd_promote() {
 
     info "Promoting from $current_mode → $target_mode..."
 
-    # Update mode in manifest.yaml in-place
-    sed -i "s/mode: $current_mode/mode: $target_mode/" "$MANIFEST"
+    # Update mode in manifest.yaml in-place (both nested and top-level)
+    sed -i "s/mode: $current_mode/mode: $target_mode/g" "$MANIFEST"
 
     # Regenerate docker-compose.yml with new MODE
     info "Regenerating docker-compose.yml..."
