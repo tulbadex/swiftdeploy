@@ -300,15 +300,8 @@ if [[ -n "$APP_CTR" ]]; then
   docker update --restart=no "$APP_CTR" >/dev/null 2>&1 || true
   docker kill "$APP_CTR" >/dev/null 2>&1 || true
   sleep 3
-  echo "  App after kill: $(docker ps -a --filter name="$APP_CTR" --format '{{.Status}}' 2>/dev/null)"
-  echo "  Nginx status: $(docker ps --filter name=swiftdeploy-nginx --format '{{.Status}}' 2>/dev/null)"
-  echo "  All swiftdeploy: $(docker ps -a --filter name=swiftdeploy --format '{{.Names}} {{.Status}}' 2>/dev/null)"
-  echo "  Requesting: ${BASE_URL}/"
-  echo "  Nginx ports: $(docker port swiftdeploy-nginx 2>/dev/null)"
-  ERR_DIRECT=$(curl -s --max-time 35 http://127.0.0.1:8080/ 2>/dev/null || echo "")
-  ERR_DOCKER=$(docker exec swiftdeploy-nginx curl -s --max-time 35 http://localhost:8080/ 2>/dev/null || echo "")
-  echo "  Direct 127.0.0.1:8080: $(echo "$ERR_DIRECT" | head -c 200)"
-  echo "  Via docker exec: $(echo "$ERR_DOCKER" | head -c 200)"
+  ERR_DIRECT=$(curl -s --max-time 35 http://127.0.0.1:${NGINX_PORT}/ 2>/dev/null || echo "")
+  ERR_DOCKER=$(docker exec swiftdeploy-nginx curl -s --max-time 35 http://localhost:${NGINX_PORT}/ 2>/dev/null || echo "")
   ERR_BODY="$ERR_DIRECT"
   [[ -z "$ERR_BODY" ]] && ERR_BODY="$ERR_DOCKER"
   docker update --restart=unless-stopped "$APP_CTR" >/dev/null 2>&1 || true
@@ -371,7 +364,8 @@ end_section
 KEEP_STACK=false
 
 # ═══ FINAL REPORT ═══
-PCT=$(echo "scale=1; $TOTAL_SCORE * 100 / $MAX_SCORE" | bc 2>/dev/null || echo "N/A")
+PCT=$(echo "scale=1; $TOTAL_SCORE * 100 / $MAX_SCORE" | bc 2>/dev/null || echo "")
+[[ -z "$PCT" ]] && PCT=$(( TOTAL_SCORE * 100 / MAX_SCORE ))
 {
   echo ""; echo "========================================"; echo "FINAL SCORES"; echo "========================================"
   for i in "${!SECTION_NAMES[@]}"; do printf "%-45s %s/%s\n" "${SECTION_NAMES[$i]}" "${SECTION_SCORES[$i]}" "${SECTION_MAX[$i]}"; done
@@ -383,9 +377,9 @@ echo ""
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo -e "${BOLD} SwiftDeploy Stage 4 — Final Score: ${TOTAL_SCORE} / ${MAX_SCORE} (${PCT}%)${RESET}"
 echo -e "${BOLD}${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-if (( $(echo "$PCT >= 90" | bc -l 2>/dev/null || echo 0) )); then echo -e "${GREEN}Grade: DISTINCTION${RESET}"
-elif (( $(echo "$PCT >= 75" | bc -l 2>/dev/null || echo 0) )); then echo -e "${GREEN}Grade: PASS${RESET}"
-elif (( $(echo "$PCT >= 60" | bc -l 2>/dev/null || echo 0) )); then echo -e "${YELLOW}Grade: MARGINAL PASS${RESET}"
+if [[ $PCT -ge 90 ]]; then echo -e "${GREEN}Grade: DISTINCTION${RESET}"
+elif [[ $PCT -ge 75 ]]; then echo -e "${GREEN}Grade: PASS${RESET}"
+elif [[ $PCT -ge 60 ]]; then echo -e "${YELLOW}Grade: MARGINAL PASS${RESET}"
 else echo -e "${RED}Grade: FAIL${RESET}"; fi
 if [[ ${#FAILURES[@]} -gt 0 ]]; then echo -e "\n${BOLD}${RED}Failed checks:${RESET}"; for f in "${FAILURES[@]}"; do echo -e "  ${RED}•${RESET} $f"; done; fi
 echo -e "\nFull report saved to: ${BOLD}${REPORT_FILE}${RESET}"
