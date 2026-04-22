@@ -303,8 +303,12 @@ if [[ -n "$APP_CTR" ]]; then
   echo "  App after kill: $(docker ps -a --filter name="$APP_CTR" --format '{{.Status}}' 2>/dev/null)"
   echo "  Nginx status: $(docker ps --filter name=swiftdeploy-nginx --format '{{.Status}}' 2>/dev/null)"
   echo "  All swiftdeploy: $(docker ps -a --filter name=swiftdeploy --format '{{.Names}} {{.Status}}' 2>/dev/null)"
+  echo "  Requesting: ${BASE_URL}/"
+  echo "  Nginx ports: $(docker port swiftdeploy-nginx 2>/dev/null)"
   ERR_RESP=$(curl -s --max-time 10 -w '\nHTTP_CODE:%{http_code}' "${BASE_URL}/" 2>/dev/null || echo "")
+  ERR_DIRECT=$(curl -s --max-time 10 http://localhost:8080/ 2>/dev/null || echo "")
   echo "  Debug response: $(echo "$ERR_RESP" | head -c 200)"
+  echo "  Direct 8080: $(echo "$ERR_DIRECT" | head -c 200)"
   ERR_BODY=$(echo "$ERR_RESP" | grep -v '^HTTP_CODE:')
   docker update --restart=unless-stopped "$APP_CTR" >/dev/null 2>&1 || true
   docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
