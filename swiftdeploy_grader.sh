@@ -305,11 +305,12 @@ if [[ -n "$APP_CTR" ]]; then
   echo "  All swiftdeploy: $(docker ps -a --filter name=swiftdeploy --format '{{.Names}} {{.Status}}' 2>/dev/null)"
   echo "  Requesting: ${BASE_URL}/"
   echo "  Nginx ports: $(docker port swiftdeploy-nginx 2>/dev/null)"
-  ERR_RESP=$(curl -s --max-time 10 -w '\nHTTP_CODE:%{http_code}' "${BASE_URL}/" 2>/dev/null || echo "")
-  ERR_DIRECT=$(curl -s --max-time 10 http://localhost:8080/ 2>/dev/null || echo "")
-  echo "  Debug response: $(echo "$ERR_RESP" | head -c 200)"
-  echo "  Direct 8080: $(echo "$ERR_DIRECT" | head -c 200)"
-  ERR_BODY=$(echo "$ERR_RESP" | grep -v '^HTTP_CODE:')
+  ERR_DIRECT=$(curl -s --max-time 10 http://127.0.0.1:8080/ 2>/dev/null || echo "")
+  ERR_DOCKER=$(docker exec swiftdeploy-nginx curl -s --max-time 5 http://localhost:8080/ 2>/dev/null || echo "")
+  echo "  Direct 127.0.0.1:8080: $(echo "$ERR_DIRECT" | head -c 200)"
+  echo "  Via docker exec: $(echo "$ERR_DOCKER" | head -c 200)"
+  ERR_BODY="$ERR_DIRECT"
+  [[ -z "$ERR_BODY" ]] && ERR_BODY="$ERR_DOCKER"
   docker update --restart=unless-stopped "$APP_CTR" >/dev/null 2>&1 || true
   docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
   if echo "$ERR_BODY" | grep -q '"error"' && echo "$ERR_BODY" | grep -q '"code"'; then
