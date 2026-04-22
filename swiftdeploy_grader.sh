@@ -294,9 +294,12 @@ else warn_only "Could not find Nginx container"; CURRENT_MAX=$((CURRENT_MAX + 5)
 echo "  Testing 502 JSON error body..."
 APP_CTR=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
-  docker stop "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
-  ERR_RESP=$(http_get "${BASE_URL}/" 2>/dev/null || echo "")
-  [[ -z "$ERR_RESP" ]] && { sleep 2; ERR_RESP=$(http_get "${BASE_URL}/" 2>/dev/null || echo ""); }
+  # Stop with no restart by updating restart policy first
+  docker update --restart=no "$APP_CTR" >/dev/null 2>&1 || true
+  docker kill "$APP_CTR" >/dev/null 2>&1 || true; sleep 2
+  ERR_RESP=$(curl -s --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
+  [[ -z "$ERR_RESP" ]] && { sleep 3; ERR_RESP=$(curl -s --max-time 10 "${BASE_URL}/" 2>/dev/null || echo ""); }
+  docker update --restart=unless-stopped "$APP_CTR" >/dev/null 2>&1 || true
   docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
   if echo "$ERR_RESP" | grep -q '"error"' && echo "$ERR_RESP" | grep -q '"code"'; then
     award 5 "Nginx returns JSON error on 502"
