@@ -73,6 +73,9 @@ else
   fi
 fi
 cd "$REPO_DIR"; echo "  Working directory: $REPO_DIR"
+# Clean up any leftover swiftdeploy containers from previous runs
+docker rm -f swiftdeploy-app swiftdeploy-nginx 2>/dev/null || true
+docker network rm swiftdeploy-net 2>/dev/null || true
 end_section
 
 # ═══ SECTION 1 — Repository Structure ═══
