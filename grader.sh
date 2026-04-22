@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ═══════════════════════════════════════════
+# Usage: ./grader.sh [github-url|local-path]
+#   No argument = run from current directory
+# ═══════════════════════════════════════════
+
 PASS=0
 FAIL=0
 TOTAL=0
+WORK_DIR=""
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -16,6 +21,27 @@ pass() { ((PASS++)); ((TOTAL++)); echo -e "${GREEN}[PASS]${NC} $1"; }
 fail() { ((FAIL++)); ((TOTAL++)); echo -e "${RED}[FAIL]${NC} $1"; }
 section() { echo -e "\n${CYAN}━━━ $1 ━━━${NC}"; }
 
+# ─── Resolve repo directory ───
+REPO_ARG="${1:-}"
+if [[ -z "$REPO_ARG" ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+elif [[ "$REPO_ARG" == http* ]]; then
+    WORK_DIR="$(mktemp -d /tmp/grader_XXXXXX)"
+    echo -e "${CYAN}[INFO]${NC} Cloning $REPO_ARG ..."
+    if git clone --depth 1 "$REPO_ARG" "$WORK_DIR/repo" 2>/dev/null; then
+        echo -e "${GREEN}[PASS]${NC} Repository cloned successfully"
+        SCRIPT_DIR="$WORK_DIR/repo"
+    else
+        echo -e "${RED}[FAIL]${NC} Failed to clone repository"
+        exit 1
+    fi
+elif [[ -d "$REPO_ARG" ]]; then
+    SCRIPT_DIR="$(cd "$REPO_ARG" && pwd)"
+else
+    echo "Usage: $0 [github-url|local-path]"
+    exit 1
+fi
+
 NGINX_PORT=$(grep 'port:' "$SCRIPT_DIR/manifest.yaml" | sed -n '2p' | awk '{print $2}')
 [ -z "$NGINX_PORT" ] && NGINX_PORT=8080
 BASE_URL="http://localhost:${NGINX_PORT}"
@@ -24,6 +50,9 @@ cleanup() {
     echo -e "\n${YELLOW}[CLEANUP]${NC} Tearing down..."
     ./swiftdeploy teardown --clean >/dev/null 2>&1
     sed -i 's/mode: canary/mode: stable/' manifest.yaml 2>/dev/null
+    if [[ -n "$WORK_DIR" && -d "$WORK_DIR" ]]; then
+        rm -rf "$WORK_DIR"
+    fi
 }
 
 trap cleanup EXIT
