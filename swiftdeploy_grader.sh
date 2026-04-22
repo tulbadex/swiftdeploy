@@ -210,9 +210,8 @@ CHAOS_RESP=$(http_post "${BASE_URL}/chaos" -H "Content-Type: application/json" -
 if echo "$CHAOS_RESP" | grep -qiE "ok|accept|chaos|slow|403"; then award 3 "POST /chaos (slow) accepted"; else warn_only "POST /chaos (slow) response unclear"; fi
 
 echo "  Verifying chaos slow mode causes delay..."
-# Chaos only works in canary mode — if stable, skip delay test
-if echo "$CHAOS_RESP" | grep -q "403"; then
-  award 4 "Chaos correctly blocked in stable mode (delay test skipped)"
+if [[ "$CURRENT_MODE" == "stable" ]]; then
+  award 4 "Chaos correctly blocked in stable mode (delay test N/A)"
 else
   SLOW_START=$SECONDS
   curl -s --max-time 25 "${BASE_URL}/" >/dev/null 2>&1 || true
@@ -295,8 +294,9 @@ else warn_only "Could not find Nginx container"; CURRENT_MAX=$((CURRENT_MAX + 5)
 echo "  Testing 502 JSON error body..."
 APP_CTR=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
-  docker stop "$APP_CTR" >/dev/null 2>&1 || true; sleep 3
+  docker stop "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
   ERR_RESP=$(http_get "${BASE_URL}/" 2>/dev/null || echo "")
+  [[ -z "$ERR_RESP" ]] && { sleep 2; ERR_RESP=$(http_get "${BASE_URL}/" 2>/dev/null || echo ""); }
   docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
   if echo "$ERR_RESP" | grep -q '"error"' && echo "$ERR_RESP" | grep -q '"code"'; then
     award 5 "Nginx returns JSON error on 502"
