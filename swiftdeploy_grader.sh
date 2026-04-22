@@ -305,8 +305,8 @@ if [[ -n "$APP_CTR" ]]; then
   echo "  All swiftdeploy: $(docker ps -a --filter name=swiftdeploy --format '{{.Names}} {{.Status}}' 2>/dev/null)"
   echo "  Requesting: ${BASE_URL}/"
   echo "  Nginx ports: $(docker port swiftdeploy-nginx 2>/dev/null)"
-  ERR_DIRECT=$(curl -s --max-time 10 http://127.0.0.1:8080/ 2>/dev/null || echo "")
-  ERR_DOCKER=$(docker exec swiftdeploy-nginx curl -s --max-time 5 http://localhost:8080/ 2>/dev/null || echo "")
+  ERR_DIRECT=$(curl -s --max-time 35 http://127.0.0.1:8080/ 2>/dev/null || echo "")
+  ERR_DOCKER=$(docker exec swiftdeploy-nginx curl -s --max-time 35 http://localhost:8080/ 2>/dev/null || echo "")
   echo "  Direct 127.0.0.1:8080: $(echo "$ERR_DIRECT" | head -c 200)"
   echo "  Via docker exec: $(echo "$ERR_DOCKER" | head -c 200)"
   ERR_BODY="$ERR_DIRECT"
