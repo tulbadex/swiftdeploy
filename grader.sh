@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -uo pipefail
 
+# Ensure docker is available (WSL uses docker.exe)
+if ! command -v docker &>/dev/null && command -v docker.exe &>/dev/null; then
+    docker() { docker.exe "$@"; }
+    export -f docker
+fi
+
 # ═══════════════════════════════════════════
 # Usage: ./grader.sh [github-url|local-path]
 #   No argument = run from current directory

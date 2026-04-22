@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ensure docker is available (WSL uses docker.exe)
+if ! command -v docker &>/dev/null && command -v docker.exe &>/dev/null; then
+    docker() { docker.exe "$@"; }
+    export -f docker
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MANIFEST="$SCRIPT_DIR/manifest.yaml"
 TEMPLATES_DIR="$SCRIPT_DIR/templates"

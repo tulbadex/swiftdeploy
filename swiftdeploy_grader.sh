@@ -2,6 +2,12 @@
 # SwiftDeploy Stage 4 — Automated Grader (no python3/PyYAML dependency)
 set -euo pipefail
 
+# Ensure docker is available (WSL uses docker.exe)
+if ! command -v docker &>/dev/null && command -v docker.exe &>/dev/null; then
+    docker() { docker.exe "$@"; }
+    export -f docker
+fi
+
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; RESET='\033[0m'
 PASS="${GREEN}✓ PASS${RESET}"; FAIL="${RED}✗ FAIL${RESET}"; WARN="${YELLOW}⚠ WARN${RESET}"
