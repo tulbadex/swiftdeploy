@@ -31,12 +31,14 @@ elif [[ "$REPO_ARG" == http* ]]; then
     if git clone --depth 1 "$REPO_ARG" "$WORK_DIR/repo" 2>/dev/null; then
         echo -e "${GREEN}[PASS]${NC} Repository cloned successfully"
         SCRIPT_DIR="$WORK_DIR/repo"
+        chmod +x "$SCRIPT_DIR/swiftdeploy" 2>/dev/null || true
     else
         echo -e "${RED}[FAIL]${NC} Failed to clone repository"
         exit 1
     fi
 elif [[ -d "$REPO_ARG" ]]; then
     SCRIPT_DIR="$(cd "$REPO_ARG" && pwd)"
+    chmod +x "$SCRIPT_DIR/swiftdeploy" 2>/dev/null || true
 else
     echo "Usage: $0 [github-url|local-path]"
     exit 1
