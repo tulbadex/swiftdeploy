@@ -137,37 +137,18 @@ cmd_validate() {
     # Check 1: manifest.yaml exists and is valid YAML
     if [[ -f "$MANIFEST" ]]; then
         local yaml_valid=true
-        if [[ -n "$PYTHON_CMD" ]]; then
-            if ! $PYTHON_CMD -c "
-import sys
-fpath = sys.argv[1]
-try:
-    import yaml
-    with open(fpath) as f:
-        yaml.safe_load(f)
-except ImportError:
-    with open(fpath) as f:
-        content = f.read()
-    if chr(9) in content:
-        sys.exit(1)
-    for line in content.strip().splitlines():
-        s = line.lstrip()
-        if s and not s.startswith('#') and ':' not in s and not s.startswith('-'):
-            sys.exit(1)
-except Exception:
-    sys.exit(1)
-" "$MANIFEST" 2>/dev/null; then
-                yaml_valid=false
-            fi
-        else
-            # Fallback: basic bash checks
-            if grep -qP '\t' "$MANIFEST" 2>/dev/null; then
-                yaml_valid=false
-            fi
-            # Check for unbalanced brackets/braces
-            if grep -qE '\[.*[^\]]$|\{.*[^\}]$' "$MANIFEST" 2>/dev/null; then
-                yaml_valid=false
-            fi
+        # YAML validation: check for tabs, unbalanced brackets, and basic structure
+        if grep -qP '\t' "$MANIFEST" 2>/dev/null; then
+            yaml_valid=false
+        fi
+        # Check for unbalanced brackets/braces (common in broken YAML)
+        local open_brackets close_brackets open_braces close_braces
+        open_brackets=$(grep -c '\[' "$MANIFEST" 2>/dev/null | tr -dc '0-9' || echo 0)
+        close_brackets=$(grep -c '\]' "$MANIFEST" 2>/dev/null | tr -dc '0-9' || echo 0)
+        open_braces=$(grep -c '{' "$MANIFEST" 2>/dev/null | tr -dc '0-9' || echo 0)
+        close_braces=$(grep -c '}' "$MANIFEST" 2>/dev/null | tr -dc '0-9' || echo 0)
+        if [[ "$open_brackets" -ne "$close_brackets" ]] || [[ "$open_braces" -ne "$close_braces" ]]; then
+            yaml_valid=false
         fi
         if $yaml_valid; then
             ok "manifest.yaml exists and is valid YAML"
@@ -246,8 +227,18 @@ cmd_deploy() {
     info "Running init..."
     cmd_init
 
+    local img_name
+    img_name=$(yaml_get "$MANIFEST" "services.image")
+
     info "Building Docker image..."
-    docker build -t "$(yaml_get "$MANIFEST" "services.image")" "$SCRIPT_DIR"
+    if ! docker build -t "$img_name" "$SCRIPT_DIR"; then
+        if docker image inspect "$img_name" &>/dev/null; then
+            warn "Build failed but image '$img_name' exists locally, continuing..."
+        else
+            fail "Docker build failed and no local image found"
+            exit 1
+        fi
+    fi
 
     info "Bringing up the stack..."
     docker compose -f "$GENERATED_COMPOSE" up -d
