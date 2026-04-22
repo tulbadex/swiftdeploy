@@ -297,17 +297,19 @@ else warn_only "Could not find Nginx container"; CURRENT_MAX=$((CURRENT_MAX + 5)
 echo "  Testing 502 JSON error body..."
 APP_CTR=$(docker ps --filter "name=swiftdeploy" --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
-  # Stop with no restart by updating restart policy first
   docker update --restart=no "$APP_CTR" >/dev/null 2>&1 || true
-  docker kill "$APP_CTR" >/dev/null 2>&1 || true; sleep 2
-  ERR_RESP=$(curl -s --max-time 10 "${BASE_URL}/" 2>/dev/null || echo "")
-  [[ -z "$ERR_RESP" ]] && { sleep 3; ERR_RESP=$(curl -s --max-time 10 "${BASE_URL}/" 2>/dev/null || echo ""); }
+  docker kill "$APP_CTR" >/dev/null 2>&1 || true
+  sleep 3
+  echo "  Container after kill: $(docker ps -a --filter name="$APP_CTR" --format '{{.Status}}' 2>/dev/null)"
+  ERR_RESP=$(curl -s --max-time 10 -w '\nHTTP_CODE:%{http_code}' "${BASE_URL}/" 2>/dev/null || echo "")
+  echo "  Debug response: $(echo "$ERR_RESP" | head -c 200)"
+  ERR_BODY=$(echo "$ERR_RESP" | grep -v '^HTTP_CODE:')
   docker update --restart=unless-stopped "$APP_CTR" >/dev/null 2>&1 || true
   docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
-  if echo "$ERR_RESP" | grep -q '"error"' && echo "$ERR_RESP" | grep -q '"code"'; then
+  if echo "$ERR_BODY" | grep -q '"error"' && echo "$ERR_BODY" | grep -q '"code"'; then
     award 5 "Nginx returns JSON error on 502"
-    if echo "$ERR_RESP" | grep -q '"service"' && echo "$ERR_RESP" | grep -q '"contact"'; then award 2 "JSON error has service and contact"; else deduct 2 "JSON error missing service or contact"; fi
-  else deduct 7 "Nginx 502 not JSON (got: $(echo "$ERR_RESP" | head -c 100))"; fi
+    if echo "$ERR_BODY" | grep -q '"service"' && echo "$ERR_BODY" | grep -q '"contact"'; then award 2 "JSON error has service and contact"; else deduct 2 "JSON error missing service or contact"; fi
+  else deduct 7 "Nginx 502 not JSON (got: $(echo "$ERR_BODY" | head -c 200))"; fi
 else warn_only "Could not find app container"; CURRENT_MAX=$((CURRENT_MAX + 7)); fi
 end_section
 
