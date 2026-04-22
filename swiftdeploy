@@ -160,8 +160,12 @@ except Exception:
                 yaml_valid=false
             fi
         else
-            # Fallback: basic bash checks (no tabs in YAML)
+            # Fallback: basic bash checks
             if grep -qP '\t' "$MANIFEST" 2>/dev/null; then
+                yaml_valid=false
+            fi
+            # Check for unbalanced brackets/braces
+            if grep -qE '\[.*[^\]]$|\{.*[^\}]$' "$MANIFEST" 2>/dev/null; then
                 yaml_valid=false
             fi
         fi

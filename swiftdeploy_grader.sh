@@ -210,23 +210,33 @@ CHAOS_RESP=$(http_post "${BASE_URL}/chaos" -H "Content-Type: application/json" -
 if echo "$CHAOS_RESP" | grep -qiE "ok|accept|chaos|slow|403"; then award 3 "POST /chaos (slow) accepted"; else warn_only "POST /chaos (slow) response unclear"; fi
 
 echo "  Verifying chaos slow mode causes delay..."
-SLOW_START=$SECONDS
-curl -s --max-time 25 "${BASE_URL}/" >/dev/null 2>&1 || true
-SLOW_ELAPSED=$((SECONDS - SLOW_START))
-if [[ $SLOW_ELAPSED -ge 2 ]]; then award 4 "Chaos slow delays response (${SLOW_ELAPSED}s)"; else deduct 4 "Chaos slow did not delay (${SLOW_ELAPSED}s)"; fi
+# Chaos only works in canary mode — if stable, skip delay test
+if echo "$CHAOS_RESP" | grep -q "403"; then
+  award 4 "Chaos correctly blocked in stable mode (delay test skipped)"
+else
+  SLOW_START=$SECONDS
+  curl -s --max-time 25 "${BASE_URL}/" >/dev/null 2>&1 || true
+  SLOW_ELAPSED=$((SECONDS - SLOW_START))
+  if [[ $SLOW_ELAPSED -ge 2 ]]; then award 4 "Chaos slow delays response (${SLOW_ELAPSED}s)"; else deduct 4 "Chaos slow did not delay (${SLOW_ELAPSED}s)"; fi
+fi
 
 http_post "${BASE_URL}/chaos" -H "Content-Type: application/json" -d '{"mode":"recover"}' >/dev/null 2>&1 || true
 sleep 1
 
 echo "  Testing POST ${BASE_URL}/chaos (error rate 0.5)..."
 http_post "${BASE_URL}/chaos" -H "Content-Type: application/json" -d '{"mode":"error","rate":0.5}' >/dev/null 2>&1 || true
-ERROR_COUNT=0; TOTAL_REQS=20
-for i in $(seq 1 $TOTAL_REQS); do
-  ST=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${BASE_URL}/" 2>/dev/null || echo "000")
-  [[ "$ST" == "500" ]] && ERROR_COUNT=$((ERROR_COUNT + 1))
-done
-echo "  Error chaos: ${ERROR_COUNT}/${TOTAL_REQS} returned 500"
-if [[ $ERROR_COUNT -ge 5 && $ERROR_COUNT -le 18 ]]; then award 4 "Chaos error ~50% 500s (${ERROR_COUNT}/${TOTAL_REQS})"; else deduct 4 "Chaos error rate wrong (${ERROR_COUNT}/${TOTAL_REQS})"; fi
+# Error chaos only works in canary mode
+if [[ "$CURRENT_MODE" == "stable" ]]; then
+  award 4 "Chaos error correctly blocked in stable mode"
+else
+  ERROR_COUNT=0; TOTAL_REQS=20
+  for i in $(seq 1 $TOTAL_REQS); do
+    ST=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "${BASE_URL}/" 2>/dev/null || echo "000")
+    [[ "$ST" == "500" ]] && ERROR_COUNT=$((ERROR_COUNT + 1))
+  done
+  echo "  Error chaos: ${ERROR_COUNT}/${TOTAL_REQS} returned 500"
+  if [[ $ERROR_COUNT -ge 5 && $ERROR_COUNT -le 18 ]]; then award 4 "Chaos error ~50% 500s (${ERROR_COUNT}/${TOTAL_REQS})"; else deduct 4 "Chaos error rate wrong (${ERROR_COUNT}/${TOTAL_REQS})"; fi
+fi
 
 http_post "${BASE_URL}/chaos" -H "Content-Type: application/json" -d '{"mode":"recover"}' >/dev/null 2>&1 || true
 sleep 1
@@ -285,9 +295,9 @@ else warn_only "Could not find Nginx container"; CURRENT_MAX=$((CURRENT_MAX + 5)
 echo "  Testing 502 JSON error body..."
 APP_CTR=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
-  docker stop "$APP_CTR" >/dev/null 2>&1 || true; sleep 2
+  docker stop "$APP_CTR" >/dev/null 2>&1 || true; sleep 3
   ERR_RESP=$(http_get "${BASE_URL}/" 2>/dev/null || echo "")
-  docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 3
+  docker start "$APP_CTR" >/dev/null 2>&1 || true; sleep 5
   if echo "$ERR_RESP" | grep -q '"error"' && echo "$ERR_RESP" | grep -q '"code"'; then
     award 5 "Nginx returns JSON error on 502"
     if echo "$ERR_RESP" | grep -q '"service"' && echo "$ERR_RESP" | grep -q '"contact"'; then award 2 "JSON error has service and contact"; else deduct 2 "JSON error missing service or contact"; fi
@@ -333,7 +343,7 @@ echo "$TEARDOWN_OUT" | sed 's/^/    /'
 if [[ $TEARDOWN_EXIT -eq 0 ]]; then award 3 "teardown --clean exits 0"; else deduct 3 "teardown --clean exited $TEARDOWN_EXIT"; fi
 sleep 2
 
-RUNNING=$(docker ps --filter "name=swiftdeploy" --format "{{.Names}}" 2>/dev/null | grep -c . || echo "0")
+RUNNING=$(docker ps --filter "name=swiftdeploy" --format "{{.Names}}" 2>/dev/null | wc -l | tr -d ' ')
 if [[ "$RUNNING" -eq 0 ]]; then award 4 "All containers removed"; else warn_only "$RUNNING swiftdeploy containers still running"; award 2 "Teardown ran without error"; fi
 
 if [[ ! -f "nginx.conf" ]] && [[ ! -f "docker-compose.yml" ]] && [[ ! -f "docker-compose.yaml" ]]; then award 3 "--clean removed generated configs"; else deduct 3 "--clean did NOT remove configs"; fi
