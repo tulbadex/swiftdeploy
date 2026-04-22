@@ -292,7 +292,7 @@ if [[ -n "$NGINX_CTR" ]]; then
 else warn_only "Could not find Nginx container"; CURRENT_MAX=$((CURRENT_MAX + 5)); fi
 
 echo "  Testing 502 JSON error body..."
-APP_CTR=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
+APP_CTR=$(docker ps --filter "name=swiftdeploy" --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
   # Stop with no restart by updating restart policy first
   docker update --restart=no "$APP_CTR" >/dev/null 2>&1 || true
@@ -318,7 +318,7 @@ if [[ -n "$IMG_NAME" ]]; then
   if [[ $IMG_MB -lt 300 ]]; then award 3 "Image is lightweight (${IMG_MB}MB)"; else deduct 3 "Image is heavy (${IMG_MB}MB)"; fi
 fi
 
-APP_CTR=$(docker ps --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
+APP_CTR=$(docker ps --filter "name=swiftdeploy" --format "{{.Names}}" 2>/dev/null | grep -iv nginx | head -1)
 if [[ -n "$APP_CTR" ]]; then
   CTR_USER=$(docker inspect "$APP_CTR" --format='{{.Config.User}}' 2>/dev/null || echo "")
   if [[ -n "$CTR_USER" && "$CTR_USER" != "root" && "$CTR_USER" != "0" ]]; then award 4 "Non-root user ('$CTR_USER')"; else deduct 4 "Container runs as root"; fi
